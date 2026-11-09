@@ -84,7 +84,6 @@ async def make_substack_client(
 ) -> AsyncGenerator[SubstackClient, None]:
     """Yield an authenticated SubstackClient from already-decoded credentials."""
     assert credentials.substack_sid is not None
-    assert credentials.connect_sid is not None
     async with SubstackClient(
         substack_sid=credentials.substack_sid,
         connect_sid=credentials.connect_sid,
