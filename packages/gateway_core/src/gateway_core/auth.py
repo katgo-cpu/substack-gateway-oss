@@ -35,8 +35,8 @@ def validate_bearer_credentials(
     parsed = urlparse(credentials.publication_url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         raise ValueError(f"{source} must contain a valid HTTP or HTTPS publication_url")
-    if not credentials.substack_sid or not credentials.connect_sid:
-        raise ValueError(f"{source} must contain substack_sid and connect_sid")
+    if not credentials.substack_sid:
+        raise ValueError(f"{source} must contain substack_sid")
 
 
 def decode_bearer_credentials(raw: str) -> BearerCredentials:
@@ -68,7 +68,6 @@ async def make_publication_client(
 ) -> AsyncGenerator[PublicationClient, None]:
     """Yield an authenticated PublicationClient from already-decoded credentials."""
     assert credentials.substack_sid is not None
-    assert credentials.connect_sid is not None
     async with PublicationClient(
         substack_sid=credentials.substack_sid,
         connect_sid=credentials.connect_sid,
