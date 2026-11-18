@@ -29,8 +29,11 @@ def _decode_gateway_token(token: str) -> BearerCredentials:
         raise HTTPException(status_code=401, detail=_INVALID_CREDENTIALS)
     try:
         return decode_bearer_credentials(raw)
-    except ValueError:
-        _log.warning("Rejected: x-gateway-token is not valid base64-encoded JSON")
+    except ValueError as exc:
+        # The ValueError messages raised by decode_bearer_credentials are fixed
+        # strings that never contain the token or any of its values, so the
+        # reason is safe to log and tells operators which check failed.
+        _log.warning("Rejected: x-gateway-token failed validation: %s", exc)
         raise HTTPException(status_code=401, detail=_INVALID_CREDENTIALS)
 
 

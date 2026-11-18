@@ -27,7 +27,25 @@ Substack's public API directly and take no `token` at all. See
 
 ## Credential Shape
 
-The credential object must include a publication URL and `substack_sid` cookie.\n`connect_sid` is optional for browser sessions where Substack does not issue one;\nthe gateway sends that cookie only when present. **This only changes gateway\nvalidation. Whether single-cookie authentication works depends on Substack's\ncurrent upstream session requirements and must be confirmed with a read-only\nidentity request before granting publishing access.**\n\nCredential example (dual-cookie session):\n
+The credential object must include a `publication_url` and the `substack_sid`
+cookie. `connect_sid` is optional for browser sessions where Substack does not
+issue one; the gateway sends that cookie only when present. **This only changes
+gateway validation. Whether single-cookie authentication works depends on
+Substack's current upstream session requirements and must be confirmed with a
+read-only identity request before granting publishing access.**
+
+### Publication destination (security)
+
+Session cookies are only ever sent to the validated publication host.
+`publication_url` must be exactly `https://<host>` (no port, userinfo, path,
+query or fragment). Set `SUBSTACK_GATEWAY_ALLOWED_PUBLICATION_HOSTS` to the
+exact host(s) you publish to (comma separated); when set it is the only
+allow-list. When unset, only single-label `*.substack.com` hosts are accepted.
+Redirects are never followed, and upstream error bodies are never logged or
+returned.
+
+Credential example (dual-cookie session):
+
 ```json
 {
   "publication_url": "https://example.substack.com",

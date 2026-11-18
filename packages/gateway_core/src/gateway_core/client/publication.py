@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from gateway_core.client.base import SubstackHTTPBase
+from gateway_core.destination import resolve_publication_destination
 
 _API_PREFIX = "api/v1"
 
@@ -20,4 +21,7 @@ class PublicationClient(SubstackHTTPBase):
         request_id: str | None = None,
     ) -> None:
         super().__init__(substack_sid, connect_sid, request_id)
-        self._base = f"{publication_url.rstrip('/')}/{_API_PREFIX}"
+        destination = resolve_publication_destination(
+            publication_url, has_session=bool(substack_sid or connect_sid)
+        )
+        self._base = f"{destination}/{_API_PREFIX}"

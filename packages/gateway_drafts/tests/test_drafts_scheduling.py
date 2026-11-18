@@ -57,7 +57,9 @@ async def test_prepublish_draft_parses_errors_and_suggestions() -> None:
 async def test_schedule_draft_posts_scheduled_release_payload() -> None:
     pub = AsyncMock()
     when = datetime(2026, 9, 16, 18, 24, tzinfo=UTC)
-    release = await _service(pub).schedule_draft(208563951, when)
+    release = await _service(pub).schedule_draft(
+        208563951, when, post_audience="only_paid", email_audience="only_paid"
+    )
     pub.post.assert_awaited_once_with(
         "drafts/208563951/scheduled_release",
         json={
@@ -90,3 +92,31 @@ async def test_unschedule_draft_deletes_scheduled_release() -> None:
     pub = AsyncMock()
     await _service(pub).unschedule_draft(208563951)
     pub.delete.assert_awaited_once_with("drafts/208563951/scheduled_release")
+
+
+@pytest.mark.anyio
+async def test_schedule_draft_has_no_implicit_paid_only_default() -> None:
+    pub = AsyncMock()
+    with pytest.raises(TypeError):
+        await _service(pub).schedule_draft(1, "2026-09-16T18:24:00Z")  # type: ignore[call-arg]
+    pub.post.assert_not_awaited()
+
+
+def test_schedule_request_requires_both_audiences() -> None:
+    from pydantic import ValidationError
+
+    from gateway_drafts.schemas import ScheduleDraftRequest
+
+    with pytest.raises(ValidationError):
+        ScheduleDraftRequest(scheduled_at=datetime(2026, 9, 16, 18, 24, tzinfo=UTC))
+    with pytest.raises(ValidationError):
+        ScheduleDraftRequest(
+            scheduled_at=datetime(2026, 9, 16, 18, 24, tzinfo=UTC),
+            post_audience="everyone",
+        )
+    ok = ScheduleDraftRequest(
+        scheduled_at=datetime(2026, 9, 16, 18, 24, tzinfo=UTC),
+        post_audience="everyone",
+        email_audience="everyone",
+    )
+    assert ok.post_audience == ok.email_audience == "everyone"

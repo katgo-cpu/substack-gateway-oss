@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from typing import Any, Self
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -29,6 +30,12 @@ def _build_limits() -> httpx.Limits:
 
 
 _LIMITS = _build_limits()
+
+
+def _safe_url(url: str) -> str:
+    """host + path only: no query string, userinfo or fragment in logs."""
+    parts = urlsplit(url)
+    return f"{parts.hostname}{parts.path}"
 
 
 def _get_limits() -> httpx.Limits:
@@ -65,7 +72,10 @@ class SubstackHTTPBase:
             # Stock path: let httpx build its own transport so environment
             # proxies (HTTP_PROXY, HTTPS_PROXY, ALL_PROXY, NO_PROXY) keep working.
             self._http = httpx.AsyncClient(
-                cookies=self._cookies, timeout=_TIMEOUT, limits=_get_limits()
+                cookies=self._cookies,
+                timeout=_TIMEOUT,
+                limits=_get_limits(),
+                follow_redirects=False,
             )
         else:
             # Limits go to the transport because httpx ignores `limits=` when a
@@ -74,6 +84,7 @@ class SubstackHTTPBase:
                 cookies=self._cookies,
                 timeout=_TIMEOUT,
                 transport=factory(_get_limits()),
+                follow_redirects=False,
             )
         return self
 
@@ -108,23 +119,37 @@ class SubstackHTTPBase:
             response = await self._http.request(method, url, **kwargs)
         except httpx.TransportError as exc:
             elapsed = time.monotonic() - start
+            # Exception class only: str(exc) can embed URLs, proxies or headers.
             _log.warning(
                 "%sSubstack network error: %s %s — %s (%.3fs)",
                 self._rid,
                 method,
-                url,
-                exc,
+                _safe_url(url),
+                type(exc).__name__,
                 elapsed,
             )
-            raise SubstackAPIError(502, f"Network error: {exc}") from exc
+            raise SubstackAPIError(502, "Network error contacting Substack") from exc
 
         elapsed = time.monotonic() - start
+        if response.is_redirect:
+            # Never follow or echo a redirect: it could carry the session
+            # cookies to another host. The Location value is deliberately
+            # not logged or returned.
+            _log.warning(
+                "%s← %s %s → %d redirect refused (%.3fs)",
+                self._rid,
+                method,
+                _safe_url(url),
+                response.status_code,
+                elapsed,
+            )
+            raise SubstackAPIError(502, "Substack returned an unexpected redirect")
         if response.status_code == 401:
             _log.warning(
                 "%s← %s %s → 401 Unauthorized (%.3fs)",
                 self._rid,
                 method,
-                url,
+                _safe_url(url),
                 elapsed,
             )
             raise SubstackAuthError(401, "Invalid or expired Substack session token")
@@ -133,7 +158,7 @@ class SubstackHTTPBase:
                 "%s← %s %s → 403 Forbidden (%.3fs)",
                 self._rid,
                 method,
-                url,
+                _safe_url(url),
                 elapsed,
             )
             raise SubstackAuthError(
@@ -145,7 +170,7 @@ class SubstackHTTPBase:
             "%s← %s %s → %d (%.3fs)",
             self._rid,
             method,
-            url,
+            _safe_url(url),
             response.status_code,
             elapsed,
         )
@@ -157,24 +182,17 @@ class SubstackHTTPBase:
     def _raise_api_error(
         self, method: str, url: str, response: httpx.Response, elapsed: float
     ) -> None:
+        # The upstream body is intentionally never read, logged or returned:
+        # it can contain account details, tokens or internal diagnostics.
         _log.warning(
             "%s← %s %s → %d (%.3fs)",
             self._rid,
             method,
-            url,
+            _safe_url(url),
             response.status_code,
             elapsed,
         )
-        try:
-            body = response.json()
-            detail = (
-                body.get("error")
-                or body.get("message")
-                or f"HTTP {response.status_code}"
-            )
-        except Exception:
-            detail = f"HTTP {response.status_code}"
         raise SubstackAPIError(
             response.status_code,
-            f"Substack returned {response.status_code}: {detail}",
+            f"Substack returned HTTP {response.status_code}",
         )

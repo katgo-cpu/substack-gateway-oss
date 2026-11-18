@@ -101,8 +101,10 @@ class DraftResponse(BaseModel):
 
 class ScheduleDraftRequest(BaseModel):
     scheduled_at: datetime
-    post_audience: str | None = None
-    email_audience: str | None = None
+    # Required on purpose: there is no default audience. Callers must state
+    # it explicitly (e.g. "everyone" for a free issue, "only_paid" for paid).
+    post_audience: str = Field(min_length=1)
+    email_audience: str = Field(min_length=1)
 
 
 class ScheduleDraftResponse(BaseModel):

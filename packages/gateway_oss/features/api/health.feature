@@ -24,16 +24,13 @@ Feature: Health check endpoints
     And the response field "connected" is true
     And the response field "tokens" is absent
 
-  Scenario: Tokens are returned when show=true
+  Scenario: Credentials are never returned, even when show=true is requested
     Given a valid gateway token "test-token" and publication URL "https://example.substack.com"
     And the Substack API is reachable
     When I send GET /api/v1/health/ready?show=true
     Then the response status code is 200
     And the response field "connected" is true
-    And the response field "tokens" is not null
-    And the response nested field "tokens.publication_url" is "https://example.substack.com"
-    And the response nested field "tokens.substack_sid" is "test-token"
-    And the response nested field "tokens.connect_sid" is "test-token"
+    And the response field "tokens" is absent
 
   Scenario: Gateway cannot reach Substack
     Given a valid gateway token "test-token" and publication URL "https://example.substack.com"
