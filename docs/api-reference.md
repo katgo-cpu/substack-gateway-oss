@@ -22,8 +22,9 @@ Public liveness probe. No credentials required. Returns `{"status": "ok"}`.
 ### `GET /api/v1/health/ready`
 
 Authenticated readiness probe that calls Substack to verify connectivity.
-Optional query parameter `show` (bool, default `false`): when `true`, echoes
-the decoded credential payload back in the response.
+Returns only `{"connected": bool}`. The former `show` option, which echoed the
+decoded credentials, has been removed; the parameter is ignored. Connectivity
+is not proof of identity or of permission on a publication.
 
 ## Me (3)
 
@@ -197,8 +198,8 @@ Runs Substack's pre-publish validation on a draft.
 ### `POST /api/v1/drafts/{draft_id}/schedule`
 
 Schedules a draft for timed release. Body: `scheduled_at` (datetime,
-required), `post_audience` and `email_audience` (optional, default
-`"only_paid"`).
+required), `post_audience` and `email_audience` (both required, no
+default; e.g. `"everyone"` for a free issue, `"only_paid"` for paid only).
 
 ### `DELETE /api/v1/drafts/{draft_id}/schedule`
 

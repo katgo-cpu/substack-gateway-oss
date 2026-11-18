@@ -26,9 +26,5 @@ class LivenessResponse(BaseModel):
     status: str
 
 
-TokensInfo = BearerCredentials
-
-
 class HealthResponse(BaseModel):
     connected: bool
-    tokens: TokensInfo | None = None

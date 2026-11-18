@@ -36,7 +36,7 @@ def test_decode_bearer_credentials_requires_publication_url() -> None:
 
 
 def test_decode_bearer_credentials_rejects_invalid_publication_url() -> None:
-    with pytest.raises(ValueError, match="valid HTTP or HTTPS publication_url"):
+    with pytest.raises(ValueError, match="not an allowed HTTPS publication host"):
         decode_bearer_credentials(
             _encode(
                 {
@@ -50,10 +50,12 @@ def test_decode_bearer_credentials_rejects_invalid_publication_url() -> None:
 
 def test_decode_bearer_credentials_accepts_sid_without_connect_sid() -> None:
     credentials = decode_bearer_credentials(
-        _encode({
-            "publication_url": "https://example.substack.com",
-            "substack_sid": "sid",
-        })
+        _encode(
+            {
+                "publication_url": "https://example.substack.com",
+                "substack_sid": "sid",
+            }
+        )
     )
     assert credentials.substack_sid == "sid"
     assert credentials.connect_sid is None
@@ -62,10 +64,12 @@ def test_decode_bearer_credentials_accepts_sid_without_connect_sid() -> None:
 def test_decode_bearer_credentials_still_requires_substack_sid() -> None:
     with pytest.raises(ValueError, match="substack_sid"):
         decode_bearer_credentials(
-            _encode({
-                "publication_url": "https://example.substack.com",
-                "connect_sid": "connect",
-            })
+            _encode(
+                {
+                    "publication_url": "https://example.substack.com",
+                    "connect_sid": "connect",
+                }
+            )
         )
 
 
@@ -81,3 +85,14 @@ def test_http_client_preserves_dual_cookie_session() -> None:
 
     client = SubstackHTTPBase(substack_sid="sid", connect_sid="connect")
     assert client._cookies == {"substack.sid": "sid", "connect.sid": "connect"}
+
+
+@pytest.mark.parametrize(
+    "url",
+    ["http://example.substack.com", "https://evil.example", "https://a.b.substack.com"],
+)
+def test_decode_bearer_credentials_rejects_disallowed_destinations(url: str) -> None:
+    with pytest.raises(ValueError, match="not an allowed HTTPS publication host"):
+        decode_bearer_credentials(
+            _encode({"publication_url": url, "substack_sid": "sid"})
+        )

@@ -4,13 +4,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from gateway_oss.api.deps import get_credentials, get_substack_client
+from gateway_oss.api.deps import get_substack_client
 from gateway_oss.client.substack import SubstackClient
 from gateway_oss.models.schemas import (
-    BearerCredentials,
     HealthResponse,
     LivenessResponse,
-    TokensInfo,
 )
 
 router = APIRouter(tags=["health"])
@@ -22,17 +20,15 @@ async def health_live() -> LivenessResponse:
     return LivenessResponse(status="ok")
 
 
-@router.get(
-    "/health/ready", response_model=HealthResponse, response_model_exclude_none=True
-)
+@router.get("/health/ready", response_model=HealthResponse)
 async def health_ready(
     client: Annotated[SubstackClient, Depends(get_substack_client)],
-    credentials: Annotated[BearerCredentials, Depends(get_credentials)],
-    show: bool = False,
 ) -> HealthResponse:
-    """Authenticated readiness probe — verifies Substack connectivity."""
-    connected = await client.check_connectivity()
-    return HealthResponse(
-        connected=connected,
-        tokens=TokensInfo.model_validate(credentials.model_dump()) if show else None,
-    )
+    """Authenticated readiness probe — verifies Substack connectivity.
+
+    Returns only ``connected``. It never returns credentials (an earlier
+    ``?show=true`` option echoed the full token and has been removed; an
+    unknown ``show`` query parameter is simply ignored). Connectivity is NOT
+    proof of identity or publication permission.
+    """
+    return HealthResponse(connected=await client.check_connectivity())

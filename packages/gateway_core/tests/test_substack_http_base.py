@@ -91,11 +91,13 @@ async def test_404_api_error_detail_from_body() -> None:
 
         async with _TestClient("sid", "connect") as client:
             with pytest.raises(
-                SubstackAPIError, match="Substack returned 404: Post not found"
+                SubstackAPIError, match="Substack returned HTTP 404"
             ) as excinfo:
                 await client.get("posts/1")
 
     assert excinfo.value.status_code == 404
+    # Upstream body text must never be echoed to callers.
+    assert "Post not found" not in excinfo.value.message
 
 
 @pytest.mark.anyio
@@ -117,7 +119,9 @@ async def test_network_error_is_logged_once(caplog: pytest.LogCaptureFixture) ->
 
         with caplog.at_level(logging.WARNING, logger="gateway_core.client.base"):
             async with _TestClient("sid", "connect", request_id="rid") as client:
-                with pytest.raises(SubstackAPIError, match="Network error: timed out"):
+                with pytest.raises(
+                    SubstackAPIError, match="Network error contacting Substack"
+                ):
                     await client.get("posts")
 
     messages = [
@@ -125,4 +129,40 @@ async def test_network_error_is_logged_once(caplog: pytest.LogCaptureFixture) ->
     ]
     assert len(messages) == 1
     assert messages[0].startswith("[rid] Substack network error: GET ")
-    assert "timed out" in messages[0]
+    assert "timed out" not in messages[0]
+    assert "ReadTimeout" in messages[0]
+
+
+@pytest.mark.anyio
+async def test_redirect_is_refused_and_not_followed() -> None:
+    with respx.mock(assert_all_mocked=True) as mock:
+        route = mock.get(f"{_BASE}/posts").respond(
+            302, headers={"location": "https://evil.example/steal?c=1"}
+        )
+
+        async with _TestClient("sid", "connect") as client:
+            with pytest.raises(SubstackAPIError) as excinfo:
+                await client.get("posts")
+
+    assert route.call_count == 1  # the Location target was never requested
+    assert excinfo.value.status_code == 502
+    assert "evil.example" not in excinfo.value.message
+
+
+@pytest.mark.anyio
+async def test_upstream_error_body_not_logged(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    secret = "tok_SECRET_VALUE_123"
+    with respx.mock(assert_all_mocked=True) as mock:
+        mock.get(f"{_BASE}/posts").respond(
+            500, json={"error": f"internal {secret}", "message": secret}
+        )
+
+        with caplog.at_level(logging.DEBUG, logger="gateway_core.client.base"):
+            async with _TestClient("sid", "connect") as client:
+                with pytest.raises(SubstackAPIError) as excinfo:
+                    await client.get("posts?token=" + secret)
+
+    assert secret not in excinfo.value.message
+    assert all(secret not in r.getMessage() for r in caplog.records)

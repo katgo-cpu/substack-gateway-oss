@@ -3,12 +3,15 @@ from __future__ import annotations
 import base64
 import contextlib
 from collections.abc import AsyncGenerator
-from urllib.parse import urlparse
 
 from pydantic import BaseModel, ValidationError
 
 from gateway_core.client.publication import PublicationClient
 from gateway_core.client.substack import SubstackClient
+from gateway_core.destination import (
+    resolve_publication_destination,
+    validate_publication_url,
+)
 
 
 class BearerCredentials(BaseModel):
@@ -32,9 +35,8 @@ def validate_bearer_credentials(
     """
     if not credentials.publication_url:
         raise ValueError(f"{source} must contain publication_url")
-    parsed = urlparse(credentials.publication_url)
-    if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        raise ValueError(f"{source} must contain a valid HTTP or HTTPS publication_url")
+    # Exact HTTPS + host allow-list; the message never echoes the value.
+    validate_publication_url(credentials.publication_url)
     if not credentials.substack_sid:
         raise ValueError(f"{source} must contain substack_sid")
 
@@ -68,6 +70,10 @@ async def make_publication_client(
 ) -> AsyncGenerator[PublicationClient, None]:
     """Yield an authenticated PublicationClient from already-decoded credentials."""
     assert credentials.substack_sid is not None
+    publication_url = resolve_publication_destination(
+        publication_url,
+        has_session=bool(credentials.substack_sid or credentials.connect_sid),
+    )
     async with PublicationClient(
         substack_sid=credentials.substack_sid,
         connect_sid=credentials.connect_sid,

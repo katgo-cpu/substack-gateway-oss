@@ -104,7 +104,7 @@ ones like `get_note`, `get_post`, and `get_post_comments`.
   AI-writing detection on a draft.
 - `check_draft(draft_id, token=None)` — run Substack's pre-publish
   validation on a draft.
-- `schedule_draft(draft_id, scheduled_at, token=None, post_audience="only_paid", email_audience="only_paid")`
+- `schedule_draft(draft_id, scheduled_at, post_audience, email_audience, token=None)` (audiences are required; there is no default)
   — schedule a draft for timed release.
 - `unschedule_draft(draft_id, token=None)` — cancel a draft's scheduled
   release.

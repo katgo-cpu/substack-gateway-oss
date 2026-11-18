@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     # rather than compare against nothing.
     admin_token: str | None = None
 
+    # Exact hostnames (comma separated, no scheme) that session cookies may be
+    # sent to as a publication. When set it is the ONLY allow-list; when unset
+    # only single-label *.substack.com hosts are accepted. Production should
+    # always set this to the BI publication host.
+    allowed_publication_hosts: str | None = None
+
     # Publication analytics timeseries rows are append-only; this many trailing
     # days are treated as still maturing and re-fetched rather than served from
     # a cache, regardless of whether an extension installs one.

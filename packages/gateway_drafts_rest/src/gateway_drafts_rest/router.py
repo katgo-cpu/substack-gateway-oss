@@ -163,8 +163,8 @@ async def schedule_draft(
     release = await service.schedule_draft(
         draft_id,
         body.scheduled_at,
-        post_audience=body.post_audience or "only_paid",
-        email_audience=body.email_audience or "only_paid",
+        post_audience=body.post_audience,
+        email_audience=body.email_audience,
     )
     return ScheduleDraftResponse.from_substack(release)
 
